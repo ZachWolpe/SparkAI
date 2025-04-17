@@ -1,0 +1,34 @@
+name: Code quality checks
+
+on:
+  pull_request
+
+jobs:
+  code-quality-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # required so 'origin/main' exists
+      - name: Ensure GitHub token auth for private repos
+        run: |
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}
+          git fetch origin main
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pre-commit and dev dependencies (CI HTTPS override)
+        run: |
+          cp requirements/requirements.txt > requirements/requirements_ci.txt
+          python -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip
+          pip install pre-commit
+          pip install -r requirements/requirements_dev.txt
+          pip install -r requirements/requirements_ci.txt
+      - name: Run pre-commit only on changed files
+        run: venv/bin/pre-commit run --from-ref origin/main --to-ref HEAD
+      - name: Fail if any files were modified (e.g. by end-of-file-fixer)
+        run: git diff --exit-code
